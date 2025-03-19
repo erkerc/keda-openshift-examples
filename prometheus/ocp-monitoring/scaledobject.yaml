@@ -1,22 +1,25 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: prometheus-scaledobject
+  name: kafka-consumer-scaler
+  namespace: eda-streams
+  labels:
+    scaledobject.keda.sh/name: kafka-consumer-scaler
 spec:
-  scaleTargetRef:
-    name: test-app
+  cooldownPeriod: 60
+  maxReplicaCount: 30
   minReplicaCount: 1
-  maxReplicaCount: 10
   pollingInterval: 5
-  cooldownPeriod:  10
+  scaleTargetRef:
+    name: reporting-consumer-deployment
   triggers:
-  - type: prometheus
-    metadata:
-      serverAddress: https://thanos-querier.openshift-monitoring.svc.cluster.local:9092
-      namespace: <NAMESPACE>                         # replace <NAMESPACE>
-      metricName: http_requests_total
-      threshold: '5'
-      query: sum(rate(http_requests_total{job="test-app"}[1m]))
-      authModes: "bearer"
-    authenticationRef:
-      name: keda-trigger-auth-prometheus
+    - type: prometheus 
+      metadata:
+        metricName: kafka_consumergroup_lag
+        namespace: eda-streams
+        query: 'sum(kafka_consumergroup_lag{topic="my-topic",consumergroup="report-group"})'
+        serverAddress: 'https://thanos-querier.openshift-monitoring.svc.cluster.local:9092'
+        threshold: '100'
+        authModes: "bearer"
+      authenticationRef:
+        name: keda-trigger-auth-prometheus
